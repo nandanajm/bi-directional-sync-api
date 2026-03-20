@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+    <http:listener-config name="bi-directional-sync-api-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="bi-directional-sync-api-config" api="bi-directional-sync-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <configuration-properties doc:name="Configuration properties" doc:id="a502d96f-9b7e-4ee3-9066-fa1432c82531" file="properties.yaml" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="209ada40-cbc0-44c6-8847-9176e7f505e9" file="properties.yaml" key="MySecretKey12345" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="c3de5999-626a-4dca-b521-72c9afe2bf5d" >
+		<db:generic-connection url="jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?currentSchema=public&amp;sslmode=require" driverClassName="org.postgresql.Driver" user="${db.user}" password="${secure::db.password}" />
+	</db:config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="ff1bacab-7874-4e32-84d0-1f520980de8d" >
+		<salesforce:basic-connection username="${sf.username}" password="${secure::sf.password}" securityToken="${secure::sf.token}" url="${sf.loginUrl}" />
+	</salesforce:sfdc-config>
+	<flow name="bi-directional-sync-api-main">
+        <http:listener config-ref="bi-directional-sync-api-httpListenerConfig" path="/api/*" allowedMethods="POST">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="bi-directional-sync-api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="bi-directional-sync-api-console">
+        <http:listener config-ref="bi-directional-sync-api-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="bi-directional-sync-api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="post:\accounts:application\json:bi-directional-sync-api-config">
+		<logger level="INFO" doc:name="Log info " doc:id="25c84386-a485-42b1-81aa-43bff7bd6829" message="Start of accounts flow" />
+		<flow-ref doc:name="Flow Reference" doc:id="ec045112-bc9f-4b43-b8a7-9820b4dc9ca1" name="db-to-sf-account-Flow" />
+		<logger level="INFO" doc:name="Log info" doc:id="0e88612c-73ae-4c46-9b3e-26ec28e5e755" message='#["End of accounts experience flow"]' />
+    </flow>
+    <flow name="post:\contacts:application\json:bi-directional-sync-api-config">
+		<logger level="INFO" doc:name="Log info " doc:id="ab38371a-1c27-4aed-8287-00b484b5137b" message='#["Start of contacts flow"]' />
+		<flow-ref doc:name="Flow Reference" doc:id="a4bfc107-4e8b-454a-adc9-23327a005d96" name="db-to-sf-contact-Flow" />
+		<logger level="INFO" doc:name="Log info" doc:id="41246bd8-eea8-4bc6-80fa-d6221860d2b7" message='#["End of contacts experience flow"]' />
+    </flow>
+	<flow name="accounts-cdc-flow" doc:id="1aad773f-557e-4a7a-bc14-3c60b6c7f9a0" >
+		<salesforce:replay-channel-listener streamingChannel="/data/AccountChangeEvent" replayOption="ONLY_NEW" doc:id="ae305ff8-bb1d-4d33-bc13-5e444e52e167" config-ref="Salesforce_Config" cacheEventsInMemory="true" doc:name="Replay channel listener" />
+		<ee:transform doc:name="Transform Message" doc:id="d2c61f97-4b99-4c5f-b16b-ee3978b5173d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var r = payload.data.payload default {}
+var h = r.ChangeEventHeader default {}
+---
+{
+    erp_account_id: r.ERP_Account_Id__c,
+    name:           r.Name,
+    account_number: r.AccountNumber,
+    industry:       r.Industry,
+    phone:          r.Phone,
+    account_type:   r.Type,
+    sf_id:          (h.recordIds default [null])[0],
+    changeType:     h.changeType
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="recordId" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.data.payload.ChangeEventHeader.recordIds[0]
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:id="789213f5-0b29-4179-880c-b31be07d1eac" config-ref="Database_Config" target="dbResult" doc:name="Select" >
+			<db:sql ><![CDATA[SELECT sf_id
+FROM public.accounts
+WHERE sf_id = :recordIds;
+ ]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	recordIds: vars.recordId
+}]]]></db:input-parameters>
+		</db:select>
+		<flow-ref doc:name="Flow Reference" doc:id="36c9ffaf-8426-492d-a383-b4e0f48c2199" name="sf-to-db-account-Flow" />
+	</flow>
+	<flow name="contacts-cdc-flow" doc:id="ff9afbb7-470b-4bba-b273-c0edaf7942bb" >
+		<salesforce:replay-channel-listener streamingChannel="/data/ContactChangeEvent" replayOption="ONLY_NEW" doc:id="30140f48-b048-4b6e-bcc0-028dacd1189f" config-ref="Salesforce_Config" cacheEventsInMemory="true" doc:name="Replay channel listener" />
+		<ee:transform doc:name="Transform Message" doc:id="db908fbd-caef-4c9a-8f0e-b2a05365d1dd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var r = payload.data.payload default {}
+var h = r.ChangeEventHeader default {}
+
+---
+{
+  erp_contact_id: r.ERP_Contact_Id__c,
+  first_name:     r.Name.FirstName,
+  last_name:      r.Name.LastName,
+  email:          r.Email,
+  phone:          r.Phone,
+  sf_id:          (h.recordIds default [null])[0],
+  changeType:     h.changeType
+}
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="recordId" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.data.payload.ChangeEventHeader.recordIds[0]
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:id="1b8329ab-f70e-4c96-baa9-c4367501ce4f" config-ref="Database_Config" target="dbResult" doc:name="Select" >
+			<db:sql ><![CDATA[SELECT sf_id
+FROM public.contacts
+WHERE sf_id = :recordIds;
+ ]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	recordIds: vars.recordId
+}]]]></db:input-parameters>
+		</db:select>
+		<flow-ref doc:name="Flow Reference" doc:id="96b55ffe-8f88-4412-9f1e-26f90d53398d" name="sf-to-db-contact-Flow" />
+	</flow>
+</mule>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<flow name="db-to-sf-account-Flow" doc:id="08b80b9e-a66e-468c-835d-4d9f5689695e" >
+		<choice doc:name="Choice" doc:id="795e4137-fd1e-4162-b930-87c2814d54fa" >
+			<when expression="#[!(payload.modifiedByMule default false)]" >
+				<logger level="INFO" doc:name="Log payload" doc:id="b5654860-5fe9-4525-bd00-368b33e111f3" message="#[payload]" />
+				<choice doc:name="Choice" doc:id="268f81d8-ded7-4056-9eed-4a4550cfd648" >
+					<when expression='#[(payload.operation default "upsert") == "delete"]' >
+						<salesforce:query doc:id="fbc5d45b-48d6-4cec-ae8d-90c48968163d" config-ref="Salesforce_Config" doc:name="get record id of member" >
+							<salesforce:salesforce-query ><![CDATA[SELECT Id
+FROM Account
+WHERE ERP_Account_Id__c = :ext
+]]></salesforce:salesforce-query>
+							<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	ext : "'" ++ (payload.record.erpAccountId as String) ++ "'"
+}]]]></salesforce:parameters>
+						</salesforce:query>
+						<salesforce:delete doc:id="8e6fa36b-e650-4a85-be14-fdc7f300edfc" config-ref="Salesforce_Config" doc:name="delete record" >
+							<salesforce:ids ><![CDATA[#[payload.Id]]]></salesforce:ids>
+						</salesforce:delete>
+						<ee:transform doc:name="response payload" doc:id="ea5ba989-e01f-46f4-9d40-5566ba6c8abf" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+
+	correlationID: correlationId,
+	"message": "Member deleted successfully"
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="Log payload" doc:id="1f5022c3-ca4c-4148-8ecb-9ed6f2200e96" message='"Account deleted successfully from SF"' />
+					</when>
+					<otherwise >
+						<ee:transform doc:name="mapping data" doc:id="b0f2d952-b394-48c1-80bd-3d0eba3b55d2" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var r = payload.record default {}
+---
+[
+  {
+    ERP_Account_Id__c: r.erpAccountId,
+    Name:              r.name,
+    AccountNumber:     r.accountNumber,
+    Industry:          r.industry,
+    Phone:             r.phone,
+    Type:      		   r.account_type
+  }
+]]]></ee:set-payload>
+							</ee:message>
+							<ee:variables />
+						</ee:transform>
+						<salesforce:upsert objectType="Account" externalIdFieldName="ERP_Account_Id__c" doc:id="8a640b23-2490-497e-b281-4aa4f86189a0" config-ref="Salesforce_Config" doc:name="Upsert Account&#10;&#10;" />
+						<ee:transform doc:name="response payload" doc:id="0e205213-42b5-4d80-83ba-3a1872693aea" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    success: payload.successful,
+    transactionId: correlationId,
+    sfResponse: payload.items
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="Log payload" doc:id="7b68c6b8-6fbe-4149-92ca-a36d96379924" message='"Account upserted successfully"' />
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="DEBUG" doc:name="Logger" doc:id="af769d0f-0191-4f6a-a7b8-5a3536eeb0d9" message="No records to update" />
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="db-to-sf-contact-Flow" doc:id="34d35672-66bf-4270-b180-9ad59c3c93f6" >
+		<choice doc:name="Choice" doc:id="354a591a-d0a0-4abd-8e6f-4e53a535a1df" >
+			<when expression="#[!(payload.modifiedByMule default false)]" >
+				<logger level="INFO" doc:name="Log payload" doc:id="cc5db927-fdba-4524-9b48-7cfbbfe43072" message="#[payload]" />
+				<choice doc:name="Choice" doc:id="9de84f45-8f44-4c56-a73e-1f93ce54e2c0" >
+					<when expression='#[(payload.operation default "upsert") == "delete"]' >
+						<salesforce:query doc:name="find Contact by External ID" doc:id="37f74359-1158-4a51-8080-9c563b932a1f" config-ref="Salesforce_Config" >
+							<salesforce:salesforce-query ><![CDATA[SELECT Id
+FROM Contact
+WHERE ERP_Contact_Id__c = :ext]]></salesforce:salesforce-query>
+							<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	ext : "'" ++ (payload.record.erpContactId as String) ++ "'"
+}]]]></salesforce:parameters>
+						</salesforce:query>
+						<salesforce:delete doc:name="delete record" doc:id="0473477e-82f9-48ad-9a21-873ea671f36b" config-ref="Salesforce_Config" >
+							<salesforce:ids ><![CDATA[#[payload.Id]]]></salesforce:ids>
+						</salesforce:delete>
+						<ee:transform doc:name="response payload" doc:id="db67a963-a8f1-495a-926e-7f2ed226295a" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    correlationId: correlationId,
+    message: "Contact deleted successfully"
+}
+]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="Log payload" doc:id="8a4fa29c-19e2-4e85-ba52-ec0a36d9169a" message='"Contact deleted successfully from SF"' />
+					</when>
+					<otherwise >
+						<ee:transform doc:name="mapping data" doc:id="d8dd63f9-c21e-4454-b525-4549bad288e9" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var r = payload.record default {}
+---
+[
+  {
+    ERP_Contact_Id__c: r.erpContactId,
+    FirstName:         r.firstName,
+    LastName:          r.lastName,
+    Email:             r.email,
+    Phone:             r.phone
+  } 
+]
+]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<salesforce:upsert objectType="Contact" externalIdFieldName="ERP_Contact_Id__c" doc:name="Upsert Contact&#10;&#10;" doc:id="707a8bb7-459a-459b-b936-16fa9325d963" config-ref="Salesforce_Config" />
+						<ee:transform doc:name="response payload" doc:id="8a6e8868-8440-4afa-93cf-7bc5c932ea82" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    success: payload.successful,
+    transactionId: correlationId,
+    sfResponse: payload.items
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="Log payload" doc:id="11f5e2cc-808f-43ef-a455-7aee092da948" message='"Contact upserted successfully"' />
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="5a482cd0-a2ac-49da-a31b-35cf0e835fd2" message="No records to update" />
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

@@ -1,0 +1,12 @@
+db:
+  host: "localhost"
+  port: "5432"
+  user: "postgres.jgwitgchktmxlvwtaqyp"
+  password: "![8kudNPZVrsRoXnx1XOXxlg==]"
+
+
+sf:
+  username: "nandana.jayakumar-manju.9345ac26dbc1@agentforce.com"
+  password: "![KcE6kcHwotURbMNWdvBN9A==]" 
+  token: "![1c0hykNOu2qrDR0YQEzUg6dnmBjH1e4izL5Rs/X5jpA=]"
+  loginUrl: "https://login.salesforce.com/services/Soap/u/55.0"

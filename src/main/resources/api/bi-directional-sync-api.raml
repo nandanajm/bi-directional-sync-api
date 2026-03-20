@@ -1,0 +1,121 @@
+#%RAML 1.0
+title: bi-directional-sync-api
+version: v1
+mediaType: application/json
+
+types:
+
+  AccountRequest:
+    type: object
+    properties:
+      operation:
+        type: string
+        enum: [ upsert, delete ]
+        required: false
+      record:
+        type: AccountRecord
+        required: true
+
+  AccountRecord:
+    type: object
+    properties:
+      erpAccountId: string
+      name: string
+      accountNumber: string
+      industry: string
+      phone: string
+      type: string
+      modifiedByMule?: boolean
+      isDeleted?: boolean
+
+  ContactRequest:
+    type: object
+    properties:
+      operation:
+        type: string
+        enum: [ upsert, delete ]
+        required: false
+      record:
+        type: ContactRecord
+        required: true
+
+  ContactRecord:
+    type: object
+    properties:
+      erpContactId: string
+      firstName: string
+      lastName: string
+      email: string
+      phone: string
+      modifiedByMule?: boolean
+      isDeleted?: boolean
+
+
+/accounts:
+  post:
+    description: |
+      Accepts Account events from external systems.
+      Supports:
+        - operation = upsert
+        - operation = delete
+    body:
+      application/json:
+        type: AccountRequest
+        example:
+          {
+            "operation": "upsert",
+            "record": {
+              "erpAccountId": "ACC-101",
+              "name": "Test Corp",
+              "accountNumber": "A-101",
+              "type": "Customer",
+              "industry": "IT",
+              "phone": "99999-11111",
+              "modifiedByMule": false,
+              "isDeleted": false
+            }
+          }
+    responses:
+      200:
+        body:
+          application/json:
+            example:
+              {
+                "success": true,
+                "transactionId": "abc-xyz-123",
+                "sfResponse": []
+              }
+
+/contacts:
+  post:
+    description: |
+      Accepts Contact events from external systems.
+      Supports:
+        - operation = upsert
+        - operation = delete
+    body:
+      application/json:
+        type: ContactRequest
+        example:
+          {
+            "operation": "upsert",
+            "record": {
+              "erpContactId": "CON-501",
+              "firstName": "Asha",
+              "lastName": "Rao",
+              "email": "asha@example.com",
+              "phone": "88888-11111",
+              "modifiedByMule": false,
+              "isDeleted": false
+            }
+          }
+    responses:
+      200:
+        body:
+          application/json:
+            example:
+              {
+                "success": true,
+                "transactionId": "def-ghi-456",
+                "sfResponse": []
+              }

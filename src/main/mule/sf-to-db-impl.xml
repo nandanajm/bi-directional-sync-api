@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="sf-to-db-account-Flow" doc:id="70814b28-5e59-44ba-b4a4-c77e5a2f5d06" >
+		<choice doc:name="Choice" doc:id="2d1962dc-c347-42e2-bdf8-089fdb78a2e6" >
+			<when expression="#[payload.changeType == 'DELETE']" >
+				<db:select doc:name="Select" doc:id="90c06817-cf5e-41ca-9634-3099f5007d84" config-ref="Database_Config" target="erpLookup" >
+					<db:sql ><![CDATA[
+            SELECT erp_account_id
+            FROM public.accounts
+            WHERE sf_id = :sf_id;
+        ]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{sf_id : payload.sf_id}]]]></db:input-parameters>
+				</db:select>
+				<logger level="INFO" doc:name="Logger" doc:id="1484d077-21d7-4a2d-acdc-f10691b5c075" message="Account CDC Delete received" />
+				<db:delete doc:name="Delete" doc:id="e026e78b-23a5-459c-a4cf-809723a725ac" config-ref="Database_Config" >
+					<db:sql ><![CDATA[DELETE FROM public.accounts WHERE erp_account_id = :erp_account_id;]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	erp_account_id: vars.erpLookup[0].erp_account_id
+}]]]></db:input-parameters>
+				</db:delete>
+				<logger level="INFO" doc:name="Logger" doc:id="c76770da-ac18-468e-8069-bcdfd0c4f599" message="Account successfully deleted in DB" />
+			</when>
+			<when expression="#[sizeOf(vars.dbResult) &gt; 0]" >
+				<logger level="INFO" doc:name="Logger" doc:id="61dda518-daf6-4abf-9d3c-087897d7a6b1" message="Account CDC Update" />
+				<db:update doc:name="Update" doc:id="e16a0813-6539-4bbf-80d7-24212e6d701f" config-ref="Database_Config" >
+					<db:sql ><![CDATA[UPDATE public.accounts
+    SET
+        name            = COALESCE(:name,            name),
+        account_number  = COALESCE(:account_number,  account_number),
+        industry        = COALESCE(:industry,        industry),
+        phone           = COALESCE(:phone,           phone),
+        account_type    = COALESCE(:account_type,    account_type),
+        sf_id           = COALESCE(:sf_id,           sf_id),
+        last_changed_at = NOW()
+    WHERE sf_id = :sf_id;
+]]></db:sql>
+					<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+				</db:update>
+				<logger level="INFO" doc:name="Logger" doc:id="eb37b44c-5529-4d8c-a09b-b888bdf09b55" message="Account updated in DB" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="0b491c68-6041-4ee5-b9dd-fe713176d936" message="Account CDC Insert" />
+				<db:insert doc:name="Insert" doc:id="07ec9bca-a9de-445a-b2dd-17e50b920028" config-ref="Database_Config" >
+					<db:sql ><![CDATA[INSERT INTO public.accounts
+(erp_account_id, name, account_number, industry, phone, account_type, sf_id, last_changed_at)
+VALUES (:erp_account_id, :name, :account_number, :industry, :phone, :account_type, :sf_id, NOW());]]></db:sql>
+					<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+				</db:insert>
+				<logger level="INFO" doc:name="Logger" doc:id="b244c350-3e5d-4eb1-8ed6-4c24c7229073" message="Successfully inserted account" />
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="sf-to-db-contact-Flow" doc:id="baef53e1-1ad1-4806-a683-5702567ddcd2" >
+		<choice doc:name="Choice" doc:id="004987af-7416-45fd-abe4-831a7f34d259" >
+			<when expression="#[payload.changeType == 'DELETE']" >
+				<db:select doc:id="4cb6d3d4-a505-4431-abc0-ff5af84d3d5e" config-ref="Database_Config" target="erpLookup" doc:name="Select" >
+					<db:sql ><![CDATA[SELECT erp_contact_id FROM public.contacts WHERE sf_id = :sf_id;
+        ]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{sf_id : payload.sf_id}]]]></db:input-parameters>
+				</db:select>
+				<logger level="INFO" doc:name="Logger" doc:id="df9fda2b-5534-4a34-8323-c1f7db24482e" message="Contact CDC Delete received" />
+				<db:delete doc:id="9b802203-9ddb-4fab-9fab-bbe88afb7dc4" config-ref="Database_Config" doc:name="Delete" >
+					<db:sql ><![CDATA[DELETE FROM public.contacts WHERE erp_contact_id = :erp_contact_id;]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	erp_contact_id: vars.erpLookup[0].erp_contact_id
+}]]]></db:input-parameters>
+				</db:delete>
+				<logger level="INFO" doc:name="Logger" doc:id="d873d4a5-7254-43a5-8104-ab3cc97b8256" message="Contact successfully deleted in DB" />
+			</when>
+			<when expression="#[sizeOf(vars.dbResult) &gt; 0]" >
+				<logger level="INFO" doc:name="Logger" doc:id="546d6702-d819-498e-b45b-12ea64975ec6" message="Contact CDC Update" />
+				<db:update doc:id="ef577a90-0a5c-46b7-8b3c-18ca88f5c88c" config-ref="Database_Config" doc:name="Update" >
+					<db:sql ><![CDATA[UPDATE public.contacts
+    SET
+        first_name      = COALESCE(:first_name,      first_name),
+        last_name       = COALESCE(:last_name,       last_name),
+        email           = COALESCE(:email,           email),
+        phone           = COALESCE(:phone,           phone),
+        sf_id           = COALESCE(:sf_id,           sf_id),
+        last_changed_at = NOW()
+    WHERE sf_id = :sf_id;
+]]></db:sql>
+					<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+				</db:update>
+				<logger level="INFO" doc:name="Logger" doc:id="65d90a02-2189-4b79-a62c-1f484e210a08" message="Contact updated in DB" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="66117b2a-d29b-4e9a-81aa-cb82cc39fb90" message="Contact CDC Insert" />
+				<db:insert doc:id="ff25d05a-1ce5-4e8f-8196-158ee3b2df16" config-ref="Database_Config" doc:name="Insert" >
+					<db:sql ><![CDATA[INSERT INTO public.contacts
+(erp_contact_id, first_name, last_name, email, phone, sf_id, last_changed_at)
+VALUES (:erp_contact_id, :first_name, :last_name, :email, :phone, :sf_id, NOW());
+]]></db:sql>
+					<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+				</db:insert>
+				<logger level="INFO" doc:name="Logger" doc:id="2fef263c-1177-4fcd-a915-1c4327f9e933" message="Sucessfully inserted contact" />
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
