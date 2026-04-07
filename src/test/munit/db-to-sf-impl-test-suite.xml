@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="db-to-sf-impl-test-suite.xml" />
+	<munit:test name="db-to-sf-impl-test-suite-db-to-sf-account-FlowTest" doc:id="b1579f88-f936-47a3-aa0c-54fd3bbc4b46" description="Test">
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to db-to-sf-account-Flow" doc:id="cb5ab7e1-d815-48b8-a1c4-3ba7bc269d08" name="db-to-sf-account-Flow"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>
